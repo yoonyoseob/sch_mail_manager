@@ -1,0 +1,967 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SCH 메일 관리</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d27;
+      --surface2: #222535;
+      --border: #2e3148;
+      --accent: #4f7cff;
+      --accent-hover: #6b93ff;
+      --success: #34d399;
+      --danger: #f87171;
+      --warn: #fbbf24;
+      --text: #e2e8f0;
+      --text-muted: #8892a4;
+      --radius: 10px;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Pretendard', 'Noto Sans KR', system-ui, sans-serif;
+      font-size: 14px;
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 24px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      height: 56px;
+    }
+    header h1 { font-size: 16px; font-weight: 600; }
+    .badge {
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 99px;
+      font-weight: 600;
+    }
+    .badge-stopped { background: #3f3f46; color: var(--text-muted); }
+    .badge-running { background: #1a3a5c; color: #60a5fa; }
+    .badge-delete-running { background: #5c1a1a; color: #f87171; }
+
+    /* --- Tabs --- */
+    .tab-bar {
+      display: flex;
+      gap: 0;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 24px;
+    }
+    .tab-btn {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-size: 13px;
+      font-weight: 600;
+      padding: 12px 20px;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: color .15s, border-color .15s;
+    }
+    .tab-btn:hover { color: var(--text); }
+    .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+    .tab-btn.active-delete { color: var(--danger); border-bottom-color: var(--danger); }
+    .tab-content { display: none !important; }
+    .tab-content.active { display: grid !important; }
+
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 24px 20px;
+    }
+
+    .grid-layout {
+      gap: 20px;
+      grid-template-columns: 340px 1fr;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+    }
+    .card-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      margin-bottom: 16px;
+    }
+
+    /* --- Controls --- */
+    .field { margin-bottom: 14px; }
+    label { display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 5px; }
+    input[type=number], select {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      padding: 7px 10px;
+      font-size: 13px;
+      outline: none;
+      transition: border-color .15s;
+    }
+    input[type=number]:focus, select:focus { border-color: var(--accent); }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 9px 18px;
+      border: none;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background .15s, opacity .15s;
+    }
+    .btn:disabled { opacity: .45; cursor: not-allowed; }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
+    .btn-danger { background: #7f1d1d; color: var(--danger); }
+    .btn-danger:hover:not(:disabled) { background: #991b1b; }
+    .btn-danger-solid { background: #dc2626; color: #fff; }
+    .btn-danger-solid:hover:not(:disabled) { background: #ef4444; }
+    .btn-row { display: flex; gap: 8px; margin-top: 6px; }
+
+    /* --- Toggle switch --- */
+    .toggle-field { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+    .toggle-field label { margin-bottom: 0; }
+    .toggle {
+      position: relative;
+      width: 40px;
+      height: 22px;
+      flex-shrink: 0;
+    }
+    .toggle input { opacity: 0; width: 0; height: 0; }
+    .toggle .slider {
+      position: absolute;
+      inset: 0;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 22px;
+      cursor: pointer;
+      transition: background .2s;
+    }
+    .toggle .slider::before {
+      content: '';
+      position: absolute;
+      width: 16px;
+      height: 16px;
+      left: 2px;
+      top: 2px;
+      background: var(--text-muted);
+      border-radius: 50%;
+      transition: transform .2s, background .2s;
+    }
+    .toggle input:checked + .slider { background: var(--accent); border-color: var(--accent); }
+    .toggle input:checked + .slider::before { transform: translateX(18px); background: #fff; }
+
+    /* --- Log --- */
+    .log-wrap {
+      background: #0a0c14;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      height: 380px;
+      overflow-y: auto;
+      padding: 14px 16px;
+      font-family: 'JetBrains Mono', 'Fira Code', 'D2Coding', monospace;
+      font-size: 12px;
+      line-height: 1.7;
+    }
+    .log-line { color: #94a3b8; word-break: break-all; }
+    .log-line.ok { color: var(--success); }
+    .log-line.warn { color: var(--warn); }
+    .log-line.err { color: var(--danger); }
+    .log-line.info { color: #60a5fa; }
+    .log-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+    .log-clear {
+      background: none;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      border-radius: 5px;
+      padding: 3px 10px;
+      font-size: 11px;
+      cursor: pointer;
+    }
+    .log-clear:hover { border-color: var(--text-muted); color: var(--text); }
+
+    /* --- Files --- */
+    .full-width { grid-column: 1 / -1; }
+    .files-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+    .files-count { font-size: 12px; color: var(--text-muted); }
+    .btn-refresh {
+      background: none;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      border-radius: 5px;
+      padding: 4px 12px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    .btn-refresh:hover { border-color: var(--accent); color: var(--accent); }
+
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th {
+      text-align: left;
+      font-size: 11px;
+      color: var(--text-muted);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border);
+    }
+    td {
+      padding: 9px 12px;
+      border-bottom: 1px solid #1e2235;
+      color: var(--text);
+    }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #1e2235; }
+
+    .tag {
+      display: inline-block;
+      font-size: 11px;
+      padding: 1px 7px;
+      border-radius: 4px;
+      font-weight: 600;
+    }
+    .tag-inbox { background: #1e3a5f; color: #93c5fd; }
+    .tag-unread { background: #1c3b2a; color: #6ee7b7; }
+
+    .dl-link {
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 500;
+    }
+    .dl-link:hover { text-decoration: underline; }
+
+    .empty-state {
+      text-align: center;
+      padding: 40px;
+      color: var(--text-muted);
+      font-size: 13px;
+    }
+
+    /* --- Search --- */
+    .search-bar {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    .search-bar input[type=text] {
+      flex: 1;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      padding: 9px 14px;
+      font-size: 14px;
+      outline: none;
+      transition: border-color .15s;
+    }
+    .search-bar input[type=text]:focus { border-color: var(--accent); }
+    .search-bar input[type=text]::placeholder { color: var(--text-muted); }
+    .search-results-count { font-size: 12px; color: var(--text-muted); margin-bottom: 10px; }
+    .search-result-item {
+      padding: 14px 16px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      margin-bottom: 8px;
+      cursor: pointer;
+      transition: border-color .15s, background .15s;
+    }
+    .search-result-item:hover { border-color: var(--accent); background: var(--surface2); }
+    .search-result-subject { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+    .search-result-meta { font-size: 12px; color: var(--text-muted); margin-bottom: 6px; }
+    .search-result-preview { font-size: 12px; color: #6b7a90; line-height: 1.5; }
+    .search-loading { text-align: center; padding: 20px; color: var(--text-muted); font-size: 13px; }
+
+    /* --- Mail Viewer Modal --- */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.65);
+      z-index: 1000;
+      justify-content: center;
+      align-items: center;
+    }
+    .modal-overlay.active { display: flex; }
+    .modal-content {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      width: 90vw;
+      max-width: 800px;
+      max-height: 85vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .modal-header {
+      padding: 18px 22px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 16px;
+    }
+    .modal-header-info { flex: 1; min-width: 0; }
+    .modal-subject { font-size: 16px; font-weight: 700; margin-bottom: 8px; word-break: break-word; }
+    .modal-meta { font-size: 12px; color: var(--text-muted); line-height: 1.8; }
+    .modal-meta b { color: var(--text); font-weight: 600; }
+    .modal-close {
+      background: none;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      border-radius: 6px;
+      width: 32px;
+      height: 32px;
+      font-size: 16px;
+      cursor: pointer;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-close:hover { border-color: var(--danger); color: var(--danger); }
+    .modal-body {
+      padding: 20px 22px;
+      overflow-y: auto;
+      flex: 1;
+      font-size: 13px;
+      line-height: 1.7;
+    }
+    .modal-body-html { all: initial; font-family: sans-serif; font-size: 14px; color: #e2e8f0; line-height: 1.6; }
+    .modal-body-html * { max-width: 100% !important; }
+    .modal-body-text { white-space: pre-wrap; word-break: break-word; }
+
+    /* --- Confirm Modal --- */
+    .confirm-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.65);
+      z-index: 1100;
+      justify-content: center;
+      align-items: center;
+    }
+    .confirm-overlay.active { display: flex; }
+    .confirm-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 28px 32px;
+      max-width: 440px;
+      width: 90vw;
+      text-align: center;
+    }
+    .confirm-icon {
+      width: 48px;
+      height: 48px;
+      margin: 0 auto 16px;
+      background: #7f1d1d;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .confirm-title { font-size: 16px; font-weight: 700; margin-bottom: 8px; }
+    .confirm-desc { font-size: 13px; color: var(--text-muted); margin-bottom: 20px; line-height: 1.6; }
+    .confirm-desc strong { color: var(--danger); }
+    .confirm-btns { display: flex; gap: 10px; justify-content: center; }
+
+    /* --- Status bar --- */
+    .status-bar {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 10px 14px;
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-bottom: 16px;
+    }
+    .status-bar span { font-weight: 600; color: var(--text); }
+
+    /* --- Warning box --- */
+    .warn-box {
+      margin-top: 12px;
+      padding: 12px 14px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      font-size: 12px;
+      color: var(--text-muted);
+      line-height: 1.8;
+    }
+    .warn-box-danger {
+      border-color: #7f1d1d;
+      background: #1a1015;
+    }
+
+    @media (max-width: 720px) {
+      .grid-layout { grid-template-columns: 1fr; }
+      .full-width { grid-column: 1; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#4f7cff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+    <polyline points="22,6 12,13 2,6"/>
+  </svg>
+  <h1>SCH 메일 관리</h1>
+  <span id="header-badge" class="badge badge-stopped">정지됨</span>
+  <span id="header-badge-del" class="badge badge-stopped" style="display:none"></span>
+</header>
+
+<!-- 탭 바 -->
+<div class="tab-bar">
+  <button class="tab-btn active" onclick="switchTab('backup')">백업 (저장)</button>
+  <button class="tab-btn" onclick="switchTab('delete')">삭제</button>
+</div>
+
+<div class="container">
+
+  <!-- ═══════════ 백업 탭 ═══════════ -->
+  <div id="tab-backup" class="tab-content active grid-layout">
+
+    <!-- 좌측: 제어판 -->
+    <div>
+      <div class="card">
+        <div class="card-title">백업 설정</div>
+
+        <div class="status-bar">상태: <span id="status-text">대기 중</span></div>
+
+        <div class="field">
+          <label>메일함 선택</label>
+          <select id="folder">
+            <option value="전체메일" selected>전체메일</option>
+            <option value="받은메일함">받은메일함</option>
+            <option value="안읽은메일함">안읽은메일함</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label>시작 페이지</label>
+          <input type="number" id="start-page" value="1" min="1" />
+        </div>
+
+        <div class="field">
+          <label>최대 페이지 수 <small style="color:var(--text-muted)">(0 = 전체)</small></label>
+          <input type="number" id="max-pages" value="0" min="0" />
+        </div>
+
+        <div class="field">
+          <label>페이지당 메일 수</label>
+          <input type="number" id="page-size" value="30" min="10" max="100" />
+        </div>
+
+        <div class="btn-row">
+          <button class="btn btn-primary" id="btn-start" onclick="startProcess()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
+            시작
+          </button>
+          <button class="btn btn-danger" id="btn-stop" onclick="stopProcess()" disabled>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+            중단
+          </button>
+        </div>
+      </div>
+
+      <div class="warn-box">
+        <strong style="color:var(--warn);">안내</strong><br>
+        시작 버튼을 누르면 Playwright 브라우저 창이 열립니다.<br>
+        해당 창에서 <strong style="color:var(--text);">로그인</strong>을 완료하면 자동으로 메일 저장이 시작됩니다.
+      </div>
+    </div>
+
+    <!-- 우측: 로그 -->
+    <div class="card">
+      <div class="log-header">
+        <div class="card-title" style="margin-bottom:0">실시간 로그</div>
+        <button class="log-clear" onclick="clearLog('log-area')">지우기</button>
+      </div>
+      <div class="log-wrap" id="log-area">
+        <div class="log-line info">백업 로그가 여기에 표시됩니다.</div>
+      </div>
+    </div>
+
+    <!-- 메일 검색 -->
+    <div class="card full-width">
+      <div class="card-title">메일 검색</div>
+      <div class="search-bar">
+        <input type="text" id="search-input" placeholder="검색어를 입력하세요 (제목, 발신자, 내용...)" onkeydown="if(event.key==='Enter') searchMails()" />
+        <button class="btn btn-primary" onclick="searchMails()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          검색
+        </button>
+      </div>
+      <div id="search-results-count" class="search-results-count"></div>
+      <div id="search-results"></div>
+    </div>
+
+    <!-- 메일 내용 모달 -->
+    <div class="modal-overlay" id="mail-modal" onclick="if(event.target===this)closeModal()">
+      <div class="modal-content">
+        <div class="modal-header">
+          <div class="modal-header-info">
+            <div class="modal-subject" id="modal-subject"></div>
+            <div class="modal-meta">
+              <b>보낸사람:</b> <span id="modal-from"></span><br>
+              <b>받는사람:</b> <span id="modal-to"></span><br>
+              <b>날짜:</b> <span id="modal-date"></span>
+            </div>
+          </div>
+          <button class="modal-close" onclick="closeModal()">&times;</button>
+        </div>
+        <div class="modal-body" id="modal-body"></div>
+      </div>
+    </div>
+
+    <!-- 하단: 다운로드 파일 목록 -->
+    <div class="card full-width">
+      <div class="files-toolbar">
+        <div class="card-title" style="margin-bottom:0">다운로드된 파일</div>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span id="files-count" class="files-count"></span>
+          <button class="btn-refresh" onclick="loadFiles()">새로고침</button>
+        </div>
+      </div>
+      <div id="files-area"><div class="empty-state">파일 목록을 불러오는 중...</div></div>
+    </div>
+
+  </div>
+
+  <!-- ═══════════ 삭제 탭 ═══════════ -->
+  <div id="tab-delete" class="tab-content grid-layout">
+
+    <!-- 좌측: 삭제 제어판 -->
+    <div>
+      <div class="card">
+        <div class="card-title" style="color:var(--danger)">삭제 설정</div>
+
+        <div class="status-bar">상태: <span id="del-status-text">대기 중</span></div>
+
+        <div class="field">
+          <label>메일함 선택</label>
+          <select id="del-folder">
+            <option value="전체메일" selected>전체메일</option>
+            <option value="받은메일함">받은메일함</option>
+            <option value="안읽은메일함">안읽은메일함</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label>시작 페이지</label>
+          <input type="number" id="del-start-page" value="1" min="1" />
+        </div>
+
+        <div class="field">
+          <label>종료 페이지 <small style="color:var(--text-muted)">(0 = 메일 소진까지)</small></label>
+          <input type="number" id="del-end-page" value="0" min="0" />
+        </div>
+
+        <div class="field">
+          <label>페이지당 메일 수</label>
+          <input type="number" id="del-page-size" value="30" min="10" max="100" />
+        </div>
+
+        <div class="btn-row">
+          <button class="btn btn-danger-solid" id="btn-del-start" onclick="confirmDelete()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="3,6 5,6 21,6"/><path d="M19,6v14a2,2,0,0,1-2,2H7a2,2,0,0,1-2-2V6m3,0V4a2,2,0,0,1,2-2h4a2,2,0,0,1,2,2v2"/>
+              <line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>
+            </svg>
+            삭제 시작
+          </button>
+          <button class="btn btn-danger" id="btn-del-stop" onclick="stopDelete()" disabled>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+            중단
+          </button>
+        </div>
+      </div>
+
+      <div class="warn-box warn-box-danger">
+        <strong style="color:var(--danger);">주의</strong><br>
+        삭제된 메일은 복구할 수 없습니다.<br>
+        반드시 <strong style="color:var(--text);">백업을 먼저 완료</strong>한 후 삭제를 진행하세요.<br><br>
+        삭제 후 메일이 앞으로 당겨지므로 시작 페이지에서 반복 삭제합니다.<br>
+        예: 시작 4, 종료 122 → 4~122페이지 분량(119회) 삭제<br>
+        종료 페이지를 0으로 설정하면 메일이 소진될 때까지 삭제합니다.
+      </div>
+    </div>
+
+    <!-- 우측: 삭제 로그 -->
+    <div class="card">
+      <div class="log-header">
+        <div class="card-title" style="margin-bottom:0;color:var(--danger)">삭제 로그</div>
+        <button class="log-clear" onclick="clearLog('del-log-area')">지우기</button>
+      </div>
+      <div class="log-wrap" id="del-log-area">
+        <div class="log-line info">삭제 로그가 여기에 표시됩니다.</div>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+
+<!-- 삭제 확인 모달 -->
+<div class="confirm-overlay" id="confirm-modal" onclick="if(event.target===this)closeConfirm()">
+  <div class="confirm-box">
+    <div class="confirm-icon">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#f87171" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="3,6 5,6 21,6"/><path d="M19,6v14a2,2,0,0,1-2,2H7a2,2,0,0,1-2-2V6m3,0V4a2,2,0,0,1,2-2h4a2,2,0,0,1,2,2v2"/>
+        <line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>
+      </svg>
+    </div>
+    <div class="confirm-title">메일 삭제 확인</div>
+    <div class="confirm-desc" id="confirm-desc"></div>
+    <div class="confirm-btns">
+      <button class="btn" style="background:var(--surface2);color:var(--text-muted)" onclick="closeConfirm()">취소</button>
+      <button class="btn btn-danger-solid" onclick="startDelete()">삭제 실행</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  /* ── 탭 전환 ── */
+  function switchTab(tab) {
+    document.querySelectorAll('.tab-btn').forEach((b, i) => {
+      b.classList.toggle('active', (i === 0 && tab === 'backup') || (i === 1 && tab === 'delete'));
+      if (i === 1) b.classList.toggle('active-delete', tab === 'delete');
+    });
+    document.getElementById('tab-backup').classList.toggle('active', tab === 'backup');
+    document.getElementById('tab-delete').classList.toggle('active', tab === 'delete');
+  }
+
+  /* ── SSE & 로그 ── */
+  let backupSSE = null;
+  let deleteSSE = null;
+  let autoScrollBackup = true;
+  let autoScrollDelete = true;
+
+  const logArea = document.getElementById('log-area');
+  const delLogArea = document.getElementById('del-log-area');
+
+  function appendLogTo(area, line, autoScroll) {
+    const div = document.createElement('div');
+    div.className = 'log-line';
+    if (/완료|성공|저장/.test(line)) div.classList.add('ok');
+    else if (/경고|warn/i.test(line)) div.classList.add('warn');
+    else if (/오류|error|fail|실패/i.test(line)) div.classList.add('err');
+    else if (/===|시작|감지|로그인|삭제 시작/.test(line)) div.classList.add('info');
+    div.textContent = line;
+    area.appendChild(div);
+    if (autoScroll) area.scrollTop = area.scrollHeight;
+  }
+
+  function clearLog(areaId) {
+    document.getElementById(areaId).innerHTML = '';
+  }
+
+  logArea.addEventListener('scroll', () => {
+    autoScrollBackup = logArea.scrollHeight - logArea.clientHeight - logArea.scrollTop < 40;
+  });
+  delLogArea.addEventListener('scroll', () => {
+    autoScrollDelete = delLogArea.scrollHeight - delLogArea.clientHeight - delLogArea.scrollTop < 40;
+  });
+
+  function connectBackupSSE() {
+    if (backupSSE) { backupSSE.close(); backupSSE = null; }
+    backupSSE = new EventSource('/api/logs');
+    backupSSE.onmessage = e => appendLogTo(logArea, JSON.parse(e.data), autoScrollBackup);
+    backupSSE.onerror = () => setTimeout(connectBackupSSE, 3000);
+  }
+
+  function connectDeleteSSE() {
+    if (deleteSSE) { deleteSSE.close(); deleteSSE = null; }
+    deleteSSE = new EventSource('/api/delete/logs');
+    deleteSSE.onmessage = e => appendLogTo(delLogArea, JSON.parse(e.data), autoScrollDelete);
+    deleteSSE.onerror = () => setTimeout(connectDeleteSSE, 3000);
+  }
+
+  /* ── 상태 폴링 ── */
+  function updateBackupStatus(data) {
+    const running = data.running;
+    const badge = document.getElementById('header-badge');
+    const statusText = document.getElementById('status-text');
+    const btnStart = document.getElementById('btn-start');
+    const btnStop = document.getElementById('btn-stop');
+
+    badge.textContent = running ? '백업 중' : '정지됨';
+    badge.className = 'badge ' + (running ? 'badge-running' : 'badge-stopped');
+    statusText.textContent = running
+      ? `실행 중 (PID: ${data.pid}, 시작: ${data.start_time})`
+      : '대기 중';
+    btnStart.disabled = running;
+    btnStop.disabled = !running;
+  }
+
+  function updateDeleteStatus(data) {
+    const running = data.running;
+    const badge = document.getElementById('header-badge-del');
+    const statusText = document.getElementById('del-status-text');
+    const btnStart = document.getElementById('btn-del-start');
+    const btnStop = document.getElementById('btn-del-stop');
+
+    badge.style.display = running ? 'inline' : 'none';
+    badge.textContent = '삭제 중';
+    badge.className = 'badge badge-delete-running';
+    statusText.textContent = running
+      ? `삭제 중 (PID: ${data.pid}, 시작: ${data.start_time})`
+      : '대기 중';
+    btnStart.disabled = running;
+    btnStop.disabled = !running;
+  }
+
+  async function pollStatus() {
+    try {
+      const [r1, r2] = await Promise.all([
+        fetch('/api/status'),
+        fetch('/api/delete/status'),
+      ]);
+      updateBackupStatus(await r1.json());
+      updateDeleteStatus(await r2.json());
+    } catch (_) {}
+  }
+
+  /* ── 백업 제어 ── */
+  async function startProcess() {
+    const payload = {
+      folder: document.getElementById('folder').value,
+      start_page: parseInt(document.getElementById('start-page').value) || 1,
+      max_pages: parseInt(document.getElementById('max-pages').value) || 0,
+      page_size: parseInt(document.getElementById('page-size').value) || 30,
+    };
+    const res = await fetch('/api/start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (!data.ok) {
+      appendLogTo(logArea, '[오류] ' + data.error, true);
+    } else {
+      appendLogTo(logArea, `[시작] PID: ${data.pid}`, true);
+      pollStatus();
+    }
+  }
+
+  async function stopProcess() {
+    const res = await fetch('/api/stop', { method: 'POST' });
+    const data = await res.json();
+    if (!data.ok) appendLogTo(logArea, '[오류] ' + data.error, true);
+  }
+
+  /* ── 삭제 제어 ── */
+  function confirmDelete() {
+    const folder = document.getElementById('del-folder').value;
+    const startPage = parseInt(document.getElementById('del-start-page').value) || 1;
+    const endPage = parseInt(document.getElementById('del-end-page').value) || 0;
+
+    let desc = `<strong>${escHtml(folder)}</strong> 메일함의 메일을 삭제합니다.<br><br>`;
+    if (endPage > 0) {
+      desc += `삭제 범위: <strong>${startPage}</strong>~<strong>${endPage}</strong>페이지 (${endPage - startPage + 1}회 반복)`;
+    } else {
+      desc += `<strong>${startPage}</strong>페이지부터 메일 소진까지 삭제`;
+    }
+    desc += '<br><br>삭제된 메일은 <strong>복구할 수 없습니다.</strong>';
+
+    document.getElementById('confirm-desc').innerHTML = desc;
+    document.getElementById('confirm-modal').classList.add('active');
+  }
+
+  function closeConfirm() {
+    document.getElementById('confirm-modal').classList.remove('active');
+  }
+
+  async function startDelete() {
+    closeConfirm();
+    const payload = {
+      folder: document.getElementById('del-folder').value,
+      start_page: parseInt(document.getElementById('del-start-page').value) || 1,
+      end_page: parseInt(document.getElementById('del-end-page').value) || 0,
+      page_size: parseInt(document.getElementById('del-page-size').value) || 30,
+    };
+    const res = await fetch('/api/delete/start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (!data.ok) {
+      appendLogTo(delLogArea, '[오류] ' + data.error, true);
+    } else {
+      appendLogTo(delLogArea, `[삭제 시작] PID: ${data.pid}`, true);
+      pollStatus();
+    }
+  }
+
+  async function stopDelete() {
+    const res = await fetch('/api/delete/stop', { method: 'POST' });
+    const data = await res.json();
+    if (!data.ok) appendLogTo(delLogArea, '[오류] ' + data.error, true);
+  }
+
+  /* ── 파일 목록 ── */
+  async function loadFiles() {
+    const res = await fetch('/api/files');
+    const files = await res.json();
+    const area = document.getElementById('files-area');
+    const countEl = document.getElementById('files-count');
+
+    countEl.textContent = `총 ${files.length}개`;
+
+    if (files.length === 0) {
+      area.innerHTML = '<div class="empty-state">다운로드된 ZIP 파일이 없습니다.</div>';
+      return;
+    }
+
+    let html = `<table>
+      <thead><tr>
+        <th>파일명</th>
+        <th>메일함</th>
+        <th style="text-align:right">크기</th>
+        <th>저장 시각</th>
+        <th></th>
+      </tr></thead>
+      <tbody>`;
+
+    for (const f of files) {
+      const tagClass = f.folder === '안읽은메일함' ? 'tag-unread' : 'tag-inbox';
+      html += `<tr>
+        <td style="font-family:monospace;font-size:12px">${escHtml(f.name)}</td>
+        <td><span class="tag ${tagClass}">${escHtml(f.folder)}</span></td>
+        <td style="text-align:right;color:var(--text-muted)">${f.size_kb} KB</td>
+        <td style="color:var(--text-muted)">${escHtml(f.mtime)}</td>
+        <td><a class="dl-link" href="/api/download/${encodeURIComponent(f.path)}">다운로드</a></td>
+      </tr>`;
+    }
+
+    html += '</tbody></table>';
+    area.innerHTML = html;
+  }
+
+  function escHtml(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  /* ── 메일 검색 ── */
+  async function searchMails() {
+    const query = document.getElementById('search-input').value.trim();
+    if (!query) return;
+
+    const resultsDiv = document.getElementById('search-results');
+    const countDiv = document.getElementById('search-results-count');
+    resultsDiv.innerHTML = '<div class="search-loading">검색 중...</div>';
+    countDiv.textContent = '';
+
+    try {
+      const res = await fetch('/api/search?q=' + encodeURIComponent(query));
+      const results = await res.json();
+      countDiv.textContent = `검색 결과: ${results.length}건`;
+
+      if (results.length === 0) {
+        resultsDiv.innerHTML = '<div class="empty-state">검색 결과가 없습니다.</div>';
+        return;
+      }
+
+      let html = '';
+      for (const r of results) {
+        html += `<div class="search-result-item" onclick="openMail('${escAttr(r.zip)}','${escAttr(r.eml)}')">
+          <div class="search-result-subject">${escHtml(r.subject)}</div>
+          <div class="search-result-meta">${escHtml(r.from)} &middot; ${escHtml(r.date)}</div>
+          <div class="search-result-preview">${escHtml(r.preview)}</div>
+        </div>`;
+      }
+      resultsDiv.innerHTML = html;
+    } catch (e) {
+      resultsDiv.innerHTML = '<div class="empty-state">검색 중 오류가 발생했습니다.</div>';
+    }
+  }
+
+  function escAttr(s) {
+    return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+  }
+
+  /* ── 메일 내용 모달 ── */
+  async function openMail(zipPath, emlName) {
+    const modal = document.getElementById('mail-modal');
+    document.getElementById('modal-subject').textContent = '불러오는 중...';
+    document.getElementById('modal-from').textContent = '';
+    document.getElementById('modal-to').textContent = '';
+    document.getElementById('modal-date').textContent = '';
+    document.getElementById('modal-body').innerHTML = '<div class="search-loading">메일 내용을 불러오는 중...</div>';
+    modal.classList.add('active');
+
+    try {
+      const res = await fetch('/api/mail/content?zip=' + encodeURIComponent(zipPath) + '&eml=' + encodeURIComponent(emlName));
+      const data = await res.json();
+      if (data.error) {
+        document.getElementById('modal-body').innerHTML = '<div class="empty-state">' + escHtml(data.error) + '</div>';
+        return;
+      }
+      document.getElementById('modal-subject').textContent = data.subject;
+      document.getElementById('modal-from').textContent = data.from;
+      document.getElementById('modal-to').textContent = data.to;
+      document.getElementById('modal-date').textContent = data.date;
+
+      const body = data.body || '';
+      if (/<\s*(html|div|p|table|br)\b/i.test(body)) {
+        document.getElementById('modal-body').innerHTML = '<div class="modal-body-html">' + body + '</div>';
+      } else {
+        document.getElementById('modal-body').innerHTML = '<div class="modal-body-text">' + escHtml(body) + '</div>';
+      }
+    } catch (e) {
+      document.getElementById('modal-body').innerHTML = '<div class="empty-state">메일을 불러올 수 없습니다.</div>';
+    }
+  }
+
+  function closeModal() {
+    document.getElementById('mail-modal').classList.remove('active');
+  }
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') { closeModal(); closeConfirm(); }
+  });
+
+  /* ── 초기화 ── */
+  connectBackupSSE();
+  connectDeleteSSE();
+  pollStatus();
+  loadFiles();
+  setInterval(pollStatus, 3000);
+</script>
+</body>
+</html>

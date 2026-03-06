@@ -1,0 +1,24 @@
+# 가상환경
+venv/
+
+# 백업된 메일 데이터 (개인정보)
+downloads/
+downloads_안읽은메일/
+
+# 인스펙트 결과물
+inspect_out/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# 복사본
+mail_downloader copy.py
+
+# Claude Code 설정
+.claude/
+
+# OS
+.DS_Store
+Thumbs.db
